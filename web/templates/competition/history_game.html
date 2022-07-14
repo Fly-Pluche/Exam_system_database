@@ -1,0 +1,239 @@
+{% extends '../base.html' %}
+{% block title %}查看答题历史情况{% endblock %}
+{% block content %}
+
+
+    <div class="main-content container">
+        <div class="position toInWhere">
+            <b>当前位置：</b><span>
+                <a onclick="history.back(-1)">考试信息</a>
+            </span>&nbsp;&gt;&nbsp;<span>{{ kind_name }}</span>
+        </div>
+        <div class="inner-content">
+            <div class="border teston mb-15 zycs_ceshi" style="display: block;">
+                    <div class="teston-top">
+                        <img src="/static/images/teston-top.jpg">
+                        <h1>{{ kind_name }}</h1>
+                        <div class="process">
+                            <span class="n2" style="color:#e4653d" id="timetext">无限制</span>
+                        </div>
+                    </div>
+            <p class="lead" style="color: #337ab7;font-size: large">
+                Q:&nbsp;&nbsp;<label id="question"></label>
+            </p>
+
+            <div id="choiceBox" class="checkbox" style="border: #31b0d5;padding-left:40%;font-size:18px;">
+                <div class="radio">
+                    <label id="item1Answer">
+                        <input type="radio" name="itemRadios" id="itemRadio1" value="item1">
+                        <label id="item1" for="itemRadio1"></label>
+                    </label>
+                </div>
+                <br />
+                <div class="radio">
+                    <label>
+                        <input type="radio" name="itemRadios" id="itemRadio2" value="item2">
+                        <label id="item2" for="itemRadio2"></label>
+                    </label>
+                </div>
+                <br />
+                <div class="radio">
+                    <label>
+                        <input type="radio" name="itemRadios" id="itemRadio3" value="item3">
+                        <label id="item3" for="itemRadio3"></label>
+                    </label>
+                </div>
+                <br />
+                <div class="radio">
+                    <label>
+                        <input type="radio" name="itemRadios" id="itemRadio4" value="item4">
+                        <label id="item4" for="itemRadio4"></label>
+                    </label>
+                </div>
+                <div class="hidden">
+                    <label>
+                        <input type="radio" name="itemRadios" id="itemRadioPk" value="pk">
+                        <label id="itemPk"></label>
+                    </label>
+                </div>
+            </div>
+
+            <p style="color: red" id="answer"></p>
+            <p style="color: red ;padding: 5px"id="replay_false"></p>
+            <p style="color: forestgreen ;padding: 5px"id="replay_true"></p>
+
+
+            <div style="margin-top: 10px;text-align:center">
+                <div id="preQuestion" class="btn btn-primary">后退</div>
+                <div id="nextQuestion" class="btn btn-primary" style="margin-left: 110px;">前进</div>
+            </div>
+            </div>
+        </div>
+
+    <!-- loading -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" data-backdrop='static'>
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="myModalLabel">提示</h4>
+                </div>
+                <div class="modal-body">
+                    <h1>查看历史...</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    <script type="text/javascript">
+    $.ajaxSetup({
+        data: {csrfmiddlewaretoken: '{{ csrf_token }}' },
+    });
+    var currentPage = 1;
+    var hasPrevious = false;
+    var hasNext = false;
+    var questionNum = 0;
+    var response;
+        $(document).ready(function () {
+            if({{ period_time|safe }}) {
+              startTimer1();
+            }
+            $('#loadingModal').modal('show');
+            uid = '{{ user_info.uid|safe }}';
+            kind_id = '{{ kind_id|safe }}';
+            $.ajax({
+                url: '/api/get_history',
+                type: 'get',
+                data: {
+                  'uid': uid,
+                  'kind_id': kind_id
+                },
+                dataType: 'json',
+                success: function (res) {
+                    response = res;
+                    questionNum = res.data.question_num;
+                    // 取答案中的第一个值
+                    $('#question').html(res.data.questions[0].question);  // currentPage - 1
+                    if(res.data.questions[0].qtype === 'choice') {            // 选择题的情况
+                        $('#item1').html(res.data.questions[0].items[0]);
+                        $('#item2').html(res.data.questions[0].items[1]);
+                        $('#item3').html(res.data.questions[0].items[2]);
+                        $('#item4').html(res.data.questions[0].items[3]);
+                        $('#itemPk').html('c_' + res.data.questions[0].pk);
+                        hasNext = (currentPage < questionNum);
+                    } else{                                                    // 填空题的情况
+                        // $('#question').html(res.data.questions[0].question.replace('##', '______'));
+                        $('#answerPk').val('f_' + res.data.questions[0].pk);
+                        hasNext = (currentPage < questionNum);
+                        $('#choiceBox').hide();
+                    }
+                    $('#answer').html('正确答案：'+res.data.answer[0]);
+
+                    if (response.data.state[0]=='1'){
+                        $('#replay_true').html('你的回答:'+response.data.answer[0]);
+                        $('#replay_true').show();
+                        $('#replay_false').hide();
+                    }
+                    else{
+                        $('#replay_false').html('你的回答:'+response.data.replay_list[0])
+                        $('#replay_false').show();
+                        $('#replay_true').hide();
+                    }
+
+                    $('#loadingModal').modal('hide');
+                }
+            });
+            // 点击前进的情况
+            $('#preQuestion').click(function () {
+                if(hasPrevious){
+                    removeChecked();
+                    clearInputData();
+                    currentPage = currentPage - 1;
+                    $('#question').html(response.data.questions[currentPage - 1].question);
+                    if(response.data.questions[currentPage - 1].qtype === 'choice') {
+                        $('#choiceBox').show();
+                        $('#item1').html(response.data.questions[currentPage - 1].items[0]);
+                        $('#item2').html(response.data.questions[currentPage - 1].items[1]);
+                        $('#item3').html(response.data.questions[currentPage - 1].items[2]);
+                        $('#item4').html(response.data.questions[currentPage - 1].items[3]);
+                        $('#itemPk').html('c_' + response.data.questions[currentPage - 1].pk);
+
+                        hasPrevious = currentPage > 1;
+                        hasNext = currentPage < questionNum
+                    }else{
+                        $('#answerPk').val(response.data.questions[currentPage - 1].pk);
+
+                        $('#choiceBox').hide();
+                        hasPrevious = currentPage > 1;
+                        hasNext = currentPage < questionNum
+                    }
+                    $('#answer').html('正确答案：'+response.data.answer[currentPage - 1]);
+
+                    if (response.data.state[currentPage - 1]==='1') {
+                        $('#replay_true').html('你的回答: ' + response.data.answer[currentPage - 1]);
+                        $('#replay_true').show();
+                        $('#replay_false').hide();
+                    }
+                    else {
+                        $('#replay_false').html('你的回答: ' + response.data.replay_list[currentPage - 1]);
+                        $('#replay_false').show();
+                        $('#replay_true').hide();
+                    }
+                }else{
+                  alert('没有题目了');
+                }
+            });
+            // 点击后退的情况
+            $('#nextQuestion').click(function () {
+              if(hasNext){
+                  removeChecked();
+                  clearInputData();
+                  currentPage = currentPage + 1;
+                  $('#question').html(response.data.questions[currentPage - 1].question);
+                  if(response.data.questions[currentPage - 1].qtype === 'choice') {
+                      $('#choiceBox').show();
+                      $('#item1').html(response.data.questions[currentPage - 1].items[0]);
+                      $('#item2').html(response.data.questions[currentPage - 1].items[1]);
+                      $('#item3').html(response.data.questions[currentPage - 1].items[2]);
+                      $('#item4').html(response.data.questions[currentPage - 1].items[3]);
+                      $('#itemPk').html('c_' + response.data.questions[currentPage - 1].pk);
+
+                      hasPrevious = currentPage > 1;
+                      hasNext = currentPage < questionNum
+                  }else{
+                      $('#answerPk').val(response.data.questions[currentPage - 1].pk);
+                      $('#answerF').val(response.data.questions[currentPage - 1].question);
+
+                      $('#choiceBox').hide();
+                      hasPrevious = currentPage > 1;
+                      hasNext = currentPage < questionNum
+                  }
+                  $('#answer').html('正确答案：' + response.data.answer[currentPage - 1]);
+                  if (response.data.state[currentPage - 1]==='1'){
+                      $('#replay_true').html('你的回答:'+response.data.answer[currentPage - 1]);
+                      $('#replay_true').show();
+                      $('#replay_false').hide();
+                  }
+                  else {
+                      $('#replay_false').html('你的回答:' + response.data.replay_list[currentPage - 1])
+                      $('#replay_true').hide();
+                      $('#replay_false').show();
+                  }
+              }else{
+                  alert('没有题目了');
+              }
+            });
+        });
+
+    function clearInputData() {
+        $('#answerF').val('');
+    }
+
+    function removeChecked() {
+        $('#itemRadio1').prop('checked', false);
+        $('#itemRadio2').prop('checked', false);
+        $('#itemRadio3').prop('checked', false);
+        $('#itemRadio4').prop('checked', false);
+    }
+
+    </script>
+{% endblock %}
